@@ -7,8 +7,8 @@ from PIL import Image
 # --- 1. CONFIGURACIÓN E IMAGEN DE FONDO ---
 st.set_page_config(page_title="Les Dragons de l'Apprentissage", layout="centered", page_icon="🐉")
 
-# URL de la imagen del Reino con Castillo
-fondo_reino = "http://googleusercontent.com/image_collection/image_retrieval/3792873239093654663_0"
+# Imagen del Reino con Castillo
+fondo_reino = "https://images.unsplash.com/photo-1514373941175-0a1410629892?q=80&w=2070&auto=format&fit=crop"
 
 st.markdown(f"""
     <style>
@@ -31,7 +31,6 @@ st.markdown(f"""
         color: white;
     }}
 
-    /* ANIMACIÓN FLOTANTE PARA EL DRAGÓN */
     .dragon-anim {{
         animation: float 3.5s ease-in-out infinite;
         filter: drop-shadow(0 0 15px gold);
@@ -46,7 +45,7 @@ st.markdown(f"""
     .xp-fill {{ height: 100%; border-radius: 15px; background: linear-gradient(90deg, #fcd34d, #f59e0b); transition: 0.5s; }}
     .fancy-title {{ font-family: 'Cinzel', serif; color: #fcd34d !important; text-shadow: 2px 2px 10px black; }}
     
-    .stButton button {{ border-radius: 12px; font-weight: bold; }}
+    .stButton button {{ border-radius: 12px; font-weight: bold; width: 100%; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -57,7 +56,6 @@ if 'user' not in st.session_state:
         'setup_complete': False, 'inventario': []
     }
 
-# Lógica del Juego de Parejas
 if 'cards' not in st.session_state:
     words = [("Manger", "Mangé"), ("Finir", "Fini"), ("Être", "Été"), ("Avoir", "Eu")]
     deck = []
@@ -108,26 +106,15 @@ def minijuego_cartas():
             reward(50, 25)
             st.success("¡Pareja encontrada! +50 XP")
             st.rerun()
-        elif st.button("No coinciden. Reintentar"):
+        elif st.button("Réessayer"):
             st.session_state.flipped = []
             st.rerun()
-
-def minijuego_caballero():
-    st.markdown("### ⚔️ Batalla del Caballero")
-    st.write("¿Cuál es el participio correcto de **'Prendre'** para derrotar al caballero?")
-    ans = st.radio("Elige tu ataque:", ["Prendu", "Pris", "Prendé"])
-    if st.button("¡Atacar!"):
-        if ans == "Pris":
-            reward(40, 20)
-            st.success("¡Victoria! Caballero derrotado. +40 XP")
-        else:
-            st.error("¡Oh no! El ataque falló.")
 
 # --- 4. VISTAS ---
 
 if not st.session_state.user['setup_complete']:
     st.markdown("<div class='glass-panel'><h1 class='fancy-title'>Bienvenue</h1>", unsafe_allow_html=True)
-    nombre = st.text_input("Ton nom, Apprenti:")
+    nombre = st.text_input("Ton nombre, Apprenti:")
     if st.button("Commencer ⚔️"):
         st.session_state.user['nombre'] = nombre
         st.session_state.user['setup_complete'] = True
@@ -141,14 +128,11 @@ else:
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
         st.markdown(f"<h1 class='fancy-title'>Niveau {fase}</h1>", unsafe_allow_html=True)
         
-        # Imagen dinámica y animada
-        try:
+        if os.path.exists(fases_dragon[fase]):
+            st.markdown(f'<img src="data:image/png;base64,{st.session_state.get("img_base64")}" class="dragon-anim" width="300">', unsafe_allow_html=True)
             st.image(fases_dragon[fase], width=300)
-            # Nota: para aplicar la clase 'dragon-anim' de CSS, el st.image es limitado. 
-            # Si los archivos están bien, podemos usar HTML:
-            # st.markdown(f'<img src="{fases_dragon[fase]}" class="dragon-anim" width="300">', unsafe_allow_html=True)
-        except:
-            st.warning(f"Sube '{fases_dragon[fase]}' para ver tu dragón.")
+        else:
+            st.info(f"Fase: {fase} (Sube {fases_dragon[fase]} para ver el diseño)")
             
         st.write(f"### {st.session_state.user['nombre']}")
         progreso = min(st.session_state.user['xp'] / 800 * 100, 100)
@@ -156,27 +140,48 @@ else:
         st.write(f"✨ {st.session_state.user['xp']} XP | 🪙 {st.session_state.user['monedas']} Pièces")
         st.markdown("</div>", unsafe_allow_html=True)
 
+    elif st.session_state.user['view'] == 'Journal':
+        st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
+        st.markdown("<h2 class='fancy-title'>Mon Journal de Réflexion</h2>", unsafe_allow_html=True)
+        
+        sentimiento = st.select_slider("Comment te sens-tu aujourd'hui ?", options=["😞", "😐", "🙂", "🤩"])
+        logro = st.text_area("Aujourd'hui, j'ai réussi à...", placeholder="Ej: Conjuguer le verbe être.")
+        duda = st.text_area("Je n'ai pas réussi à...", placeholder="Ej: Me souvenir du participe passé de boire.")
+        mejora_clase = st.text_area("Est-ce que tu changerais quelque chose de la classe ?", placeholder="Tus sugerencias...")
+        mejora_personal = st.text_area("Est-ce que tu dois améliorer quelque chose ?", placeholder="Tus objetivos personales...")
+
+        if st.button("Enregistrer mon journal 📝"):
+            # Valoramos el registro diario y la honestidad sobre las dudas (error como proceso)
+            puntos_base = 30
+            puntos_reflexion = 20 if duda else 0
+            reward(puntos_base + puntos_reflexion, 15)
+            st.success("Journal enregistré ! Merci pour ta réflexion. +50 XP")
+            time.sleep(2)
+            st.session_state.user['view'] = 'Home'
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
     elif st.session_state.user['view'] == 'Jeux':
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
-        game = st.selectbox("Challenge:", ["Cartas Memory", "Batalla Caballero"])
-        if game == "Cartas Memory": minijuego_cartas()
-        else: minijuego_caballero()
+        minijuego_cartas()
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.user['view'] == 'Boutique':
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
         st.markdown("<h2 class='fancy-title'>Boutique de Magie</h2>", unsafe_allow_html=True)
         st.write(f"Tesoro: {st.session_state.user['monedas']} 🪙")
-        c1, c2 = st.columns(2)
-        if c1.button("Épée de Feu (50 🪙)"):
+        if st.button("Épée de Feu (50 🪙)"):
             if st.session_state.user['monedas'] >= 50:
                 st.session_state.user['monedas'] -= 50
                 st.session_state.user['inventario'].append("Épée")
-                st.success("¡Comprada!")
+                st.success("Achetée !")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # NAVEGACIÓN
-    cols = st.columns(3)
-    if cols[0].button("🏠 Foyer"): st.session_state.user['view'] = 'Home'; st.rerun()
-    if cols[1].button("🎮 Entraînement"): st.session_state.user['view'] = 'Jeux'; st.rerun()
-    if cols[2].button("💎 Boutique"): st.session_state.user['view'] = 'Boutique'; st.rerun()
+    # NAVEGACIÓN DOCK
+    st.markdown("<div style='position: fixed; bottom: 10px; left: 0; right: 0;'><div style='display: flex; justify-content: center; gap: 10px;'>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    if c1.button("🏠 Home"): st.session_state.user['view'] = 'Home'; st.rerun()
+    if c2.button("📝 Journal"): st.session_state.user['view'] = 'Journal'; st.rerun()
+    if c3.button("🎮 Jeux"): st.session_state.user['view'] = 'Jeux'; st.rerun()
+    if c4.button("💎 Boutique"): st.session_state.user['view'] = 'Boutique'; st.rerun()
+    st.markdown("</div></div>", unsafe_allow_html=True)
