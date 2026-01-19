@@ -3,7 +3,7 @@ import time
 import random
 import os
 
-# --- 1. CONFIGURACIÓN E IMAGEN DE FONDO ---
+# --- 1. CONFIGURACIÓN Y ESTILO ---
 st.set_page_config(page_title="Les Dragons de l'Apprentissage", layout="centered", page_icon="🐉")
 
 fondo_reino = "https://images.unsplash.com/photo-1514373941175-0a1410629892?q=80&w=2070&auto=format&fit=crop"
@@ -21,11 +21,12 @@ st.markdown(f"""
         text-align: center; margin-bottom: 20px; color: white;
     }}
     .fancy-title {{ font-family: 'Cinzel', serif; color: #fcd34d !important; text-shadow: 2px 2px 10px black; }}
-    .stButton button {{ border-radius: 12px; font-weight: bold; width: 100%; }}
+    .stButton button {{ border-radius: 12px; font-weight: bold; width: 100%; transition: 0.3s; }}
+    .stButton button:hover {{ transform: scale(1.05); background-color: #fcd34d; color: black; }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. GESTIÓN DE ESTADO ---
+# --- 2. ESTADO DEL JUEGO ---
 if 'user' not in st.session_state:
     st.session_state.user = {
         'nombre': 'Apprenti', 'xp': 0, 'monedas': 100, 'view': 'Home', 
@@ -44,47 +45,42 @@ def obtener_fase(xp):
     elif xp < 800: return "Expert"
     else: return "Maître"
 
-# --- 3. SECCIÓN DE JUEGOS ---
+# --- 3. MINIJUEGOS ---
 
-def duelo_caballero():
-    st.markdown("### ⚔️ Le Duel du Chevalier")
-    st.write("El Caballero Oscuro te bloquea el paso. ¡Usa la gramática para vencer!")
-    pregunta = "¿Cuál es el auxiliar correcto para el verbo **'Aller'**?"
-    opciones = ["Avoir", "Être", "Aller"]
-    eleccion = st.radio(pregunta, opciones)
-    if st.button("¡Atacar!"):
-        if eleccion == "Être":
-            st.success("¡Touché! Has vencido al caballero. +40 XP / +20 🪙")
-            reward(40, 20)
-        else:
-            st.error("El caballero ha bloqueado tu ataque. ¡Repasa la lista de verbos 'Être'!")
-
-def sopa_letras():
-    st.markdown("### 🔍 Soupe de Mots")
-    st.write("Encuentra el verbo oculto entre las letras: **P R E N D R E**")
-    grid = """
-    A B P R E N D R E X
-    L O R Q W E R T Y U
-    L P E Z X C V B N M
-    E M N J K L H G F D
-    R Q W E R T Y U I O
-    """
-    st.code(grid, language=None)
-    respuesta = st.text_input("¿Qué verbo has encontrado?")
-    if st.button("Verificar"):
-        if respuesta.upper() == "PRENDRE" or respuesta.upper() == "ALLER":
-            st.success("¡Excelente vista! +30 XP / +15 🪙")
+def minijuego_sopa():
+    st.markdown("### 🔍 Mots Mêlés (Sopa de Letras)")
+    st.write("Encuentra los verbos en infinitivo ocultos:")
+    palabras = ["AVOIR", "ÊTRE", "ALLER", "FAIRE"]
+    # Rejilla visual simple
+    st.code("A V O I R X P\nL L F A I R E\nL E T R E Z Q\nE R G T B C M")
+    intento = st.text_input("Escribe una palabra que hayas encontrado:").upper()
+    if st.button("Vérifier 🔍"):
+        if intento in palabras:
             reward(30, 15)
+            st.success(f"¡Bien! Has encontrado {intento}. +30 XP")
         else:
-            st.warning("Sigue buscando...")
+            st.error("Esa palabra no está o ya la encontraste.")
+
+def minijuego_duelo():
+    st.markdown("### ⚔️ Le Duel du Chevalier")
+    st.write("El caballero te bloquea el paso. ¡Elige la forma correcta del verbo!")
+    pregunta = "¿Cómo se dice 'Nosotros hemos terminado'?"
+    opciones = ["Nous avons fini", "Nous sommes fini", "Nous avons finu"]
+    eleccion = st.radio(pregunta, opciones)
+    if st.button("¡Lanzar Hechizo! ✨"):
+        if eleccion == "Nous avons fini":
+            reward(50, 20)
+            st.balloons()
+            st.success("¡Victoria! El caballero se retira. +50 XP / +20 🪙")
+        else:
+            st.error("¡Oh no! Has fallado el ataque.")
 
 # --- 4. VISTAS ---
 
 if not st.session_state.user['setup_complete']:
     st.markdown("<div class='glass-panel'><h1 class='fancy-title'>Bienvenue</h1>", unsafe_allow_html=True)
-    nombre = st.text_input("Ton nom, Apprenti:")
+    st.session_state.user['nombre'] = st.text_input("Ton nom, Apprenti:")
     if st.button("Commencer ⚔️"):
-        st.session_state.user['nombre'] = nombre
         st.session_state.user['setup_complete'] = True
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
@@ -98,59 +94,58 @@ else:
         if os.path.exists(fases_dragon[fase]):
             st.image(fases_dragon[fase], width=300)
         else:
-            st.info(f"Fase: {fase}")
+            st.warning(f"Sube {fases_dragon[fase]} para ver el dragón.")
         st.write(f"### {st.session_state.user['nombre']}")
         st.write(f"✨ {st.session_state.user['xp']} XP | 🪙 {st.session_state.user['monedas']} Pièces")
+        st.write(f"🎒 Inventaire: {', '.join(st.session_state.user['inventario']) if st.session_state.user['inventario'] else 'Vide'}")
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.user['view'] == 'Journal':
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
         st.markdown("<h2 class='fancy-title'>Mon Journal</h2>", unsafe_allow_html=True)
-        st.select_slider("Sentimiento", ["😞", "😐", "🙂", "🤩"])
+        st.select_slider("Sentiment:", ["😞", "😐", "🙂", "🤩"])
         st.text_area("Aujourd'hui, j'ai réussi à...")
         st.text_area("Je n'ai pas réussi à...")
-        if st.button("Sauvegarder 📝"):
-            reward(50, 10)
-            st.success("¡Progreso guardado!")
+        if st.button("Enregistrer 📝"):
+            reward(40, 10)
+            st.success("Réflexion enregistrée ! +40 XP")
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.user['view'] == 'Jeux':
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
-        st.markdown("<h2 class='fancy-title'>Zone de Jeux</h2>", unsafe_allow_html=True)
-        tab1, tab2 = st.tabs(["⚔️ Duel du Chevalier", "🔍 Soupe de Mots"])
-        with tab1: duelo_caballero()
-        with tab2: sopa_letras()
+        tipo_juego = st.selectbox("Choisis un défi:", ["Sopa de Letras", "Duelo del Caballero", "Cartas Memory"])
+        if tipo_juego == "Sopa de Letras": minijuego_sopa()
+        elif tipo_juego == "Duelo del Caballero": minijuego_duelo()
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.user['view'] == 'Boutique':
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
-        st.markdown("<h2 class='fancy-title'>Boutique Magique</h2>", unsafe_allow_html=True)
-        st.write(f"Tesoro: {st.session_state.user['monedas']} 🪙")
+        st.markdown("<h2 class='fancy-title'>Armurerie Royale</h2>", unsafe_allow_html=True)
+        st.write(f"Ton Or: {st.session_state.user['monedas']} 🪙")
         
-        productos = [
-            ("🛡️ Bouclier d'Argent", 40),
-            ("🧪 Potion de Grammaire", 25),
-            ("📜 Parchemin Ancien", 60),
-            ("✨ Baguette Magique", 100),
-            ("👑 Couronne Royale", 250)
-        ]
+        items = {
+            "⚔️ Épée de Feu": 50,
+            "🛡️ Bouclier Magique": 40,
+            "🪖 Casque de Fer": 30,
+            "🛡️ Armure en Or": 100
+        }
         
-        for prod, precio in productos:
+        for item, precio in items.items():
             col1, col2 = st.columns([2, 1])
-            col1.write(f"{prod}")
-            if col2.button(f"{precio} 🪙", key=prod):
+            col1.write(f"**{item}**")
+            if col2.button(f"Acheter ({precio} 🪙)", key=item):
                 if st.session_state.user['monedas'] >= precio:
                     st.session_state.user['monedas'] -= precio
-                    st.session_state.user['inventario'].append(prod)
-                    st.success(f"¡Has comprado {prod}!")
+                    st.session_state.user['inventario'].append(item)
+                    st.success(f"¡Has comprado {item}!")
+                    st.rerun()
                 else:
-                    st.error("¡No tienes suficientes monedas!")
+                    st.error("No tienes suficiente oro.")
         st.markdown("</div>", unsafe_allow_html=True)
 
     # NAVEGACIÓN
-    st.markdown("<hr>", unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    if c1.button("🏠 Home"): st.session_state.user['view'] = 'Home'; st.rerun()
-    if c2.button("📝 Journal"): st.session_state.user['view'] = 'Journal'; st.rerun()
-    if c3.button("🎮 Jeux"): st.session_state.user['view'] = 'Jeux'; st.rerun()
-    if c4.button("💎 Boutique"): st.session_state.user['view'] = 'Boutique'; st.rerun()
+    cols = st.columns(4)
+    if cols[0].button("🏠 Foyer"): st.session_state.user['view'] = 'Home'; st.rerun()
+    if cols[1].button("📝 Journal"): st.session_state.user['view'] = 'Journal'; st.rerun()
+    if cols[2].button("🎮 Jeux"): st.session_state.user['view'] = 'Jeux'; st.rerun()
+    if cols[3].button("💎 Boutique"): st.session_state.user['view'] = 'Boutique'; st.rerun()
