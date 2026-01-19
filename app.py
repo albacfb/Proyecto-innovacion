@@ -5,21 +5,21 @@ import random
 # --- 1. CONFIGURACIÓN E INYECCIÓN DE DISEÑO "EPIC DRAGON CASTLE" ---
 st.set_page_config(page_title="Les Dragons de l'Apprentissage", layout="centered", page_icon="🐉")
 
-# CSS: Fondo personalizado, animaciones de fuego y paneles translúcidos
+# CSS: Fondo con Dragón y Castillo, animaciones de fuego y paneles translúcidos
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Quicksand:wght@400;600&display=swap');
 
-    /* FONDO DE CASTILLO ÉPICO Y DRAGÓN (Basado en tu última imagen) */
+    /* FONDO DE CASTILLO ÉPICO Y DRAGÓN */
     .stApp {
-        background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), 
-                    url('https://images.unsplash.com/photo-1599423300746-b62533397364?q=80&w=2070&auto=format&fit=crop');
+        background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
+                    url('https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=2070&auto=format&fit=crop');
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
     }
 
-    /* DRAGÓN ANIMADO */
+    /* DRAGÓN ANIMADO (SPRITE PRINCIPAL) */
     .dragon-container { position: relative; width: 180px; margin: 0 auto; padding: 20px; }
     .dragon-sprite { width: 150px; animation: float 3s ease-in-out infinite; z-index: 2; position: relative; }
     
@@ -45,6 +45,7 @@ st.markdown("""
         text-align: center; margin-bottom: 20px;
     }
 
+    /* BARRA DE PROGRESO (LÍNEA DE PROCESO) */
     .xp-bg { width: 100%; background: rgba(255,255,255,0.1); border-radius: 15px; height: 14px; margin: 15px 0; border: 1px solid rgba(255,255,255,0.1); }
     .xp-fill { height: 100%; border-radius: 15px; background: linear-gradient(90deg, #fcd34d, #f59e0b); box-shadow: 0 0 10px gold; }
 
@@ -101,7 +102,7 @@ def sopa_de_letras():
             st.success("¡Excelente! Has dominado el imperativo.")
             st.balloons()
         else:
-            st.error("Esa palabra no es correcta o no está en la lista.")
+            st.error("Esa palabra no es correcta.")
 
 def memory_parejas():
     st.markdown("### 🧠 Memoriser: Passé Composé")
@@ -118,7 +119,7 @@ def memory_parejas():
             st.success("¡Pareja perfecta! +40 XP")
             st.session_state.user['on_fire'] = True
         else:
-            st.error("No coinciden... ¡inténtalo de nuevo!")
+            st.error("No coinciden...")
 
 # --- 4. VISTAS ---
 
@@ -139,8 +140,11 @@ else:
         st.markdown("<h1 class='fancy-title'>Les Dragons de l'Apprentissage</h1>", unsafe_allow_html=True)
         st.markdown(f"""<div class="dragon-container"><div class="fire-effect"></div><img src="https://cdn-icons-png.flaticon.com/512/616/616430.png" class="dragon-sprite"></div>""", unsafe_allow_html=True)
         st.write(f"### {st.session_state.user['nombre']}")
+        
+        # BARRA DE PROGRESO (LÍNEA DE PROCESO)
         progress = min(st.session_state.user['xp'] / 1000 * 100, 100)
         st.markdown(f'<div class="xp-bg"><div class="xp-fill" style="width:{progress}%"></div></div>', unsafe_allow_html=True)
+        
         st.write(f"✨ {st.session_state.user['xp']} XP | 🪙 {st.session_state.user['monedas']} Pièces")
         if st.session_state.user['inventario']:
             st.write("🎒 **Items:** " + ", ".join(st.session_state.user['inventario']))
@@ -155,7 +159,7 @@ else:
             st.write("Derrota al caballero: ¿Cuál es el participio de **FAIRE**?")
             if st.button("FAIT"):
                 reward(30, 15); st.session_state.user['on_fire'] = True
-                st.success("¡Victoria! Dragón en llamas.")
+                st.success("¡Victoria!")
         elif tipo == "🔍 Sopa de Letras":
             sopa_de_letras()
         elif tipo == "🧠 Parejas":
@@ -184,7 +188,7 @@ else:
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
         st.markdown("<h2 class='fancy-title'>Mon Journal</h2>", unsafe_allow_html=True)
         appris = st.text_area("Ce que j'ai appris...")
-        duda = st.text_area("Mes doutes (Error = Progrès)")
+        duda = st.text_area("Mes doutes...")
         if st.button("Sauvegarder"):
             reward(50 if duda else 25, 20)
             st.session_state.user['view'] = 'Home'; st.rerun()
