@@ -1,77 +1,68 @@
 import streamlit as st
 import time
 import random
+import pandas as pd
 
-# --- 1. CONFIGURACIÓN E INYECCIÓN DE DISEÑO "TABLET FANTASY" ---
+# --- 1. CONFIGURACIÓN E INYECCIÓN DE DISEÑO ---
 st.set_page_config(page_title="Les Dragons de l'Apprentissage", layout="centered", page_icon="🐉")
 
-# CSS para imitar la imagen: Mapa de Francia de fondo, Glassmorphism y Sidebar
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Quicksand:wght@400;600&display=swap');
 
     .stApp {
-        background: linear-gradient(rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.8)), 
-                    url('https://img.freepik.com/free-vector/france-map-with-landmarks-illustration_52683-47535.jpg');
+        background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), 
+                    url('https://images.unsplash.com/photo-1599423300746-b62533397364?q=80&w=2070&auto=format&fit=crop');
         background-size: cover;
         background-position: center;
+        background-attachment: fixed;
         color: #f8fafc;
         font-family: 'Quicksand', sans-serif;
     }
 
-    /* Estilo de la Tarjeta Central (Glassmorphism de la imagen) */
     .glass-panel {
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(15px);
-        -webkit-backdrop-filter: blur(15px);
-        border: 2px solid rgba(255, 255, 255, 0.2);
-        border-radius: 30px;
-        padding: 40px;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 35px;
+        padding: 30px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
         text-align: center;
-        margin-top: 20px;
+        margin-bottom: 20px;
     }
 
     .fancy-title {
         font-family: 'Cinzel', serif;
-        font-size: 2.5rem !important;
-        color: white !important;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        margin-bottom: 5px;
+        font-size: 2rem !important;
+        color: #fcd34d !important;
+        text-shadow: 2px 2px 10px rgba(0,0,0,0.8);
     }
 
-    /* Sidebar de Evolución (Derecha) */
-    .evo-sidebar {
-        position: fixed;
-        right: 30px;
-        top: 25%;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        background: rgba(255, 255, 255, 0.1);
-        padding: 20px;
-        border-radius: 50px;
+    /* Estilo de botones de juegos */
+    .game-card {
+        background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        padding: 10px;
+        cursor: pointer;
+        transition: 0.3s;
     }
-
-    .evo-step { font-size: 30px; opacity: 0.3; filter: grayscale(1); transition: 0.5s; }
-    .evo-active { opacity: 1; filter: grayscale(0); transform: scale(1.3); }
-
-    /* Botones Estilo App */
-    .stButton button {
-        border-radius: 20px !important;
-        padding: 10px 24px !important;
-        background: rgba(255, 255, 255, 0.2) !important;
-        color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.4) !important;
-        font-weight: bold !important;
-        transition: 0.3s !important;
+    
+    .letter-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 5px;
+        max-width: 400px;
+        margin: auto;
     }
-    .stButton button:hover { background: rgba(255, 255, 255, 0.4) !important; transform: translateY(-2px); }
-
-    /* Barra de Progreso */
-    .xp-bg { width: 100%; background: rgba(255,255,255,0.1); border-radius: 20px; height: 12px; margin: 10px 0; }
-    .xp-fill { height: 100%; border-radius: 20px; background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+    
+    .letter-cell {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 5px;
+        padding: 10px;
+        font-weight: bold;
+        color: white;
+    }
 
     #MainMenu, footer, header {visibility: hidden;}
     </style>
@@ -85,114 +76,107 @@ if 'user' not in st.session_state:
         'dragon_color': '#FFD700',
         'xp': 10,
         'monedas': 0,
-        'inventario': [],
         'fase': 'Oeuf',
         'view': 'Home'
     }
 
-ASSETS = {
-    "Oeuf": "https://cdn-icons-png.flaticon.com/512/3232/3232670.png",
-    "Bébé": "https://cdn-icons-png.flaticon.com/512/7880/7880222.png",
-    "Jeune": "https://cdn-icons-png.flaticon.com/512/1625/1625348.png",
-    "Ailé": "https://cdn-icons-png.flaticon.com/512/4699/4699313.png"
-}
+if 'game_state' not in st.session_state:
+    st.session_state.game_state = {
+        'pair_selected': None,
+        'soup_found': []
+    }
 
-# --- 3. LÓGICA DE EVOLUCIÓN ---
-def check_evolution():
-    xp = st.session_state.user['xp']
-    if xp >= 700: st.session_state.user['fase'] = "Ailé"
-    elif xp >= 300: st.session_state.user['fase'] = "Jeune"
-    elif xp >= 100: st.session_state.user['fase'] = "Bébé"
-    else: st.session_state.user['fase'] = "Oeuf"
+# --- 3. LÓGICA DE JUEGOS ---
 
-# --- 4. NAVEGACIÓN Y VISTAS ---
+def render_match_pairs():
+    st.subheader("🤝 Associer les Paires (Passé Composé)")
+    pares = {"Manger": "Mangé", "Prendre": "Pris", "Vendre": "Vendu", "Être": "Été"}
+    
+    col1, col2 = st.columns(2)
+    infinitivos = list(pares.keys())
+    participios = list(pares.values())
+    random.shuffle(infinitivos)
+    random.shuffle(participios)
+    
+    with col1:
+        inf = st.selectbox("Infinitif", ["Selecciona..."] + infinitivos)
+    with col2:
+        part = st.selectbox("Participe Passé", ["Selecciona..."] + participios)
+        
+    if st.button("Vérifier la paire"):
+        if inf != "Selecciona..." and part != "Selecciona...":
+            if pares.get(inf) == part:
+                st.success(f"¡Correcto! {inf} -> {part}")
+                st.session_state.user['xp'] += 10
+                st.session_state.user['monedas'] += 5
+                st.balloons()
+            else:
+                st.error("No es correcto, ¡sigue intentándolo!")
+
+def render_word_search():
+    st.subheader("🔍 Mots Mêlés (Sopa de Letras)")
+    # Cuadrícula simplificada 8x8 con palabras ocultas: "EU", "FAIT", "MIS"
+    grid = [
+        ['F','A','I','T','X','Q','L','P'],
+        ['A','Z','E','U','R','T','Y','O'],
+        ['I','S','D','F','G','H','J','K'],
+        ['T','M','I','S','L','Z','X','C'],
+        ['B','N','M','Q','W','E','R','T'],
+        ['A','S','D','F','G','H','J','K'],
+        ['L','O','P','I','U','Y','T','R'],
+        ['Q','W','E','R','T','Y','U','I']
+    ]
+    
+    st.markdown("<div class='letter-grid'>", unsafe_allow_html=True)
+    for row in grid:
+        cols = st.columns(8)
+        for i, char in enumerate(row):
+            cols[i].markdown(f"<div class='letter-cell'>{char}</div>", unsafe_allow_html=True)
+    
+    palabra = st.text_input("¿Qué participio encontraste?").upper()
+    if st.button("Valider le mot"):
+        if palabra in ["FAIT", "EU", "MIS"]:
+            st.success(f"¡Increíble! Encontraste {palabra}")
+            st.session_state.user['xp'] += 15
+            st.session_state.user['monedas'] += 10
+        else:
+            st.warning("Esa palabra no está o no es un participio válido.")
+
+# --- 4. VISTAS PRINCIPALES ---
+
 if not st.session_state.user['setup_complete']:
-    st.markdown("<div class='glass-panel'><h1 class='fancy-title'>Bienvenue</h1><p>Configura tu compañero</p>", unsafe_allow_html=True)
-    nombre = st.text_input("Nom de l'Apprenti:")
-    color = st.color_picker("Couleur de ton dragon:", "#FFD700")
-    if st.button("Éclore l'oeuf 🥚"):
-        st.session_state.user['nombre'] = nombre
-        st.session_state.user['dragon_color'] = color
+    st.markdown("<div class='glass-panel'><h1 class='fancy-title'>Bienvenue</h1>", unsafe_allow_html=True)
+    st.session_state.user['nombre'] = st.text_input("Nom:")
+    if st.button("Commencer"):
         st.session_state.user['setup_complete'] = True
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 else:
-    check_evolution()
-    fase = st.session_state.user['fase']
-    
-    # Sidebar Visual (Como en la imagen)
-    st.markdown(f"""
-        <div class="evo-sidebar">
-            <div class="evo-step {'evo-active' if fase == 'Ailé' else ''}">🐉</div>
-            <div class="evo-step {'evo-active' if fase == 'Jeune' else ''}">🦖</div>
-            <div class="evo-step {'evo-active' if fase == 'Bébé' else ''}">👶</div>
-            <div class="evo-step {'evo-active' if fase == 'Oeuf' else ''}">🥚</div>
-        </div>
-    """, unsafe_allow_html=True)
+    # Sidebar de evolución (simplificada para el ejemplo)
+    st.sidebar.title(f"🐉 {st.session_state.user['fase']}")
+    st.sidebar.metric("XP", st.session_state.user['xp'])
+    st.sidebar.metric("Pièces", st.session_state.user['monedas'])
 
     if st.session_state.user['view'] == 'Home':
-        st.markdown(f"<div class='glass-panel'><h1 class='fancy-title'>Les Dragons de l'Apprentissage</h1>", unsafe_allow_html=True)
-        st.markdown(f"<img src='{ASSETS[fase]}' width='220' style='filter: drop-shadow(0 0 15px {st.session_state.user['dragon_color']}); margin-bottom: 20px;'>", unsafe_allow_html=True)
-        st.write(f"### {st.session_state.user['nombre']} - Stade {fase}")
-        
-        # Barra de XP
-        progress = min(st.session_state.user['xp'] / 1000 * 100, 100)
-        st.markdown(f'<div class="xp-bg"><div class="xp-fill" style="width:{progress}%"></div></div>', unsafe_allow_html=True)
-        st.caption(f"XP: {st.session_state.user['xp']} | Pièces: {st.session_state.user['monedas']} 🪙")
+        st.markdown("<div class='glass-panel'><h1 class='fancy-title'>Les Dragons de l'Apprentissage</h1>", unsafe_allow_html=True)
+        st.image("https://cdn-icons-png.flaticon.com/512/1625/1625348.png", width=150)
+        st.write(f"Bonjour, **{st.session_state.user['nombre']}**!")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    elif st.session_state.user['view'] == 'Registro':
-        st.markdown("<div class='glass-panel'><h2>Mon Journal de Français</h2>", unsafe_allow_html=True)
-        mood = st.select_slider("Mon Humeur du Jour", ["😴", "😐", "🙂", "🔥"])
-        appris = st.text_area("Ce que j'ai appris aujourd'hui...")
-        duda = st.text_area("Ce que je n'ai pas compris (Error = Progress!)")
-        
-        if st.button("Enregistrer"):
-            xp_ganado = 20 if appris else 10
-            bonus_error = 30 if duda else 0
-            st.session_state.user['xp'] += (xp_ganado + bonus_error)
-            st.session_state.user['monedas'] += 10
-            
-            if duda:
-                st.balloons()
-                st.success("Bravo! Valorar tus dudas te hace evolucionar más rápido.")
-            
-            time.sleep(2)
-            st.session_state.user['view'] = 'Home'
-            st.rerun()
+    elif st.session_state.user['view'] == 'Jeux':
+        st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
+        st.markdown("<h1 class='fancy-title'>Salle d'Entraînement</h1>", unsafe_allow_html=True)
+        tab1, tab2 = st.tabs(["Unir Parejas", "Sopa de Letras"])
+        with tab1:
+            render_match_pairs()
+        with tab2:
+            render_word_search()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    elif st.session_state.user['view'] == 'Tienda':
-        st.markdown("<div class='glass-panel'><h2>La Grotte aux Trésors 💎</h2>", unsafe_allow_html=True)
-        st.write(f"Tu as **{st.session_state.user['monedas']}** pièces 🪙")
-        
-        items = [
-            {"name": "Couronne Royale", "cost": 30, "icon": "👑"},
-            {"name": "Ailes de Feu", "cost": 50, "icon": "🔥"},
-            {"name": "Livre de Magie", "cost": 20, "icon": "📖"}
-        ]
-        
-        cols = st.columns(3)
-        for i, item in enumerate(items):
-            with cols[i]:
-                st.write(f"{item['icon']}\n**{item['name']}**")
-                if st.button(f"Acheter ({item['cost']} 🪙)", key=item['name']):
-                    if st.session_state.user['monedas'] >= item['cost']:
-                        st.session_state.user['monedas'] -= item['cost']
-                        st.session_state.user['inventario'].append(item['name'])
-                        st.success(f"¡{item['name']} comprado!")
-                        st.rerun()
-                    else:
-                        st.error("¡No tienes suficientes monedas!")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # --- DOCK DE NAVEGACIÓN INFERIOR ---
+    # --- NAVEGACIÓN ---
     st.markdown("<br><br>", unsafe_allow_html=True)
-    nav_cols = st.columns(3)
-    with nav_cols[0]:
-        if st.button("🏠 Home", use_container_width=True): st.session_state.user['view'] = 'Home'; st.rerun()
-    with nav_cols[1]:
-        if st.button("➕ Journal", use_container_width=True): st.session_state.user['view'] = 'Registro'; st.rerun()
-    with nav_cols[2]:
-        if st.button("💎 Grotte", use_container_width=True): st.session_state.user['view'] = 'Tienda'; st.rerun()
+    c1, c2, c3 = st.columns(3)
+    if c1.button("🏠 Home"): st.session_state.user['view'] = 'Home'; st.rerun()
+    if c2.button("🎮 Minijeux"): st.session_state.user['view'] = 'Jeux'; st.rerun()
+    if c3.button("📝 Journal"): st.session_state.user['view'] = 'Registro'; st.rerun()
