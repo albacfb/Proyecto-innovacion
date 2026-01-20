@@ -23,6 +23,22 @@ st.markdown(f"""
     .fancy-title {{ font-family: 'Cinzel', serif; color: #fcd34d !important; text-shadow: 2px 2px 10px black; }}
     .stButton button {{ border-radius: 12px; font-weight: bold; width: 100%; transition: 0.3s; }}
     .stButton button:hover {{ transform: scale(1.05); background-color: #fcd34d; color: black; }}
+    
+    /* BARRA DE PROGRESO VISUAL */
+    .progress-container {{
+        width: 100%;
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        margin: 20px 0;
+        border: 1px solid rgba(254, 211, 77, 0.3);
+        overflow: hidden;
+    }}
+    .progress-bar {{
+        height: 20px;
+        background: linear-gradient(90deg, #fcd34d, #f59e0b);
+        box-shadow: 0 0 15px #fcd34d;
+        transition: width 0.5s ease-in-out;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -51,7 +67,6 @@ def minijuego_sopa():
     st.markdown("### 🔍 Mots Mêlés (Sopa de Letras)")
     st.write("Encuentra los verbos en infinitivo ocultos:")
     palabras = ["AVOIR", "ÊTRE", "ALLER", "FAIRE"]
-    # Rejilla visual simple
     st.code("A V O I R X P\nL L F A I R E\nL E T R E Z Q\nE R G T B C M")
     intento = st.text_input("Escribe una palabra que hayas encontrado:").upper()
     if st.button("Vérifier 🔍"):
@@ -65,7 +80,7 @@ def minijuego_duelo():
     st.markdown("### ⚔️ Le Duel du Chevalier")
     st.write("El caballero te bloquea el paso. ¡Elige la forma correcta del verbo!")
     pregunta = "¿Cómo se dice 'Nosotros hemos terminado'?"
-    opciones = ["Nous avons fini", "Nous sommes fini", "Nous avons finu"]
+    opciones = ["Nous avons fini", "Nous somos fini", "Nous avons finu"]
     eleccion = st.radio(pregunta, opciones)
     if st.button("¡Lanzar Hechizo! ✨"):
         if eleccion == "Nous avons fini":
@@ -91,10 +106,21 @@ else:
     if st.session_state.user['view'] == 'Home':
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
         st.markdown(f"<h1 class='fancy-title'>Niveau {fase}</h1>", unsafe_allow_html=True)
+        
+        # Barra de progreso visual
+        proximo_nivel = 150 if fase == "Oeuf" else 400 if fase == "Bébé" else 800 if fase == "Expert" else 1000
+        porcentaje = min((st.session_state.user['xp'] / proximo_nivel) * 100, 100)
+        st.markdown(f"""
+            <div class="progress-container">
+                <div class="progress-bar" style="width: {porcentaje}%;"></div>
+            </div>
+        """, unsafe_allow_html=True)
+        
         if os.path.exists(fases_dragon[fase]):
             st.image(fases_dragon[fase], width=300)
         else:
             st.warning(f"Sube {fases_dragon[fase]} para ver el dragón.")
+        
         st.write(f"### {st.session_state.user['nombre']}")
         st.write(f"✨ {st.session_state.user['xp']} XP | 🪙 {st.session_state.user['monedas']} Pièces")
         st.write(f"🎒 Inventaire: {', '.join(st.session_state.user['inventario']) if st.session_state.user['inventario'] else 'Vide'}")
@@ -102,13 +128,32 @@ else:
 
     elif st.session_state.user['view'] == 'Journal':
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
-        st.markdown("<h2 class='fancy-title'>Mon Journal</h2>", unsafe_allow_html=True)
-        st.select_slider("Sentiment:", ["😞", "😐", "🙂", "🤩"])
-        st.text_area("Aujourd'hui, j'ai réussi à...")
-        st.text_area("Je n'ai pas réussi à...")
-        if st.button("Enregistrer 📝"):
-            reward(40, 10)
-            st.success("Réflexion enregistrée ! +40 XP")
+        st.markdown("<h2 class='fancy-title'>Mon Journal de Réflexion</h2>", unsafe_allow_html=True)
+        
+        st.subheader("1. État d'esprit")
+        st.select_slider("Comment te sens-tu aujourd'hui ?", ["😞", "😐", "🙂", "🤩"])
+        
+        st.subheader("2. Progrès du jour")
+        success = st.text_area("Aujourd'hui, j'ai réussi à... (Obligatorio)", placeholder="Ej: He aprendido a conjugar el passé composé")
+        
+        st.subheader("3. Défis")
+        fail = st.text_area("Je n'ai pas réussi à... (Obligatorio)", placeholder="Ej: Todavía me confundo con los participios irregulares")
+        
+        st.subheader("4. Retours sur la classe")
+        change = st.text_area("Qu'est-ce que tu changerais de la classe ?", placeholder="Sugerencias para el profesor...")
+        
+        st.subheader("5. Auto-amélioration")
+        improve = st.text_area("Qu'est-ce que tu dois améliorer ?", placeholder="Tus metas personales...")
+
+        if st.button("Enregistrer mon Journal 📝"):
+            if success.strip() == "" or fail.strip() == "":
+                st.error("🚫 Por favor, completa los campos de 'j'ai réussi à' y 'je n'ai pas réussi à' antes de guardar.")
+            else:
+                reward(40, 10)
+                st.success("✅ Réflexion enregistrée ! Ton honnêteté te fait grandir. +40 XP")
+                time.sleep(1)
+                st.session_state.user['view'] = 'Home'
+                st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.user['view'] == 'Jeux':
