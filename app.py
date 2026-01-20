@@ -192,4 +192,4 @@ else:
     if cols[0].button("🏠 Foyer"): st.session_state.user['view'] = 'Home'; st.rerun()
     if cols[1].button("📝 Journal"): st.session_state.user['view'] = 'Journal'; st.rerun()
     if cols[2].button("🎮 Jeux"): st.session_state.user['view'] = 'Jeux'; st.rerun()
-    if cols[3].button("💎 Boutique"): st.session_state.user['view'] = 'Boutique'; st.rerun()rerun()
+    if cols[3].button("💎 Boutique"): st.session_state.user['view'] = 'Boutique'; st.rerun()
