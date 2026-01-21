@@ -7,44 +7,69 @@ import gspread
 import json
 
 # --- 1. CONFIGURACIÓN Y ESTILO ---
-st.set_page_config(page_title="Le Royaume des Savoirs", layout="centered", page_icon="🗺️")
+st.set_page_config(page_title="Le Royaume des Savoirs", layout="wide", page_icon="🗺️")
 
-# Fondo de castillo épico con dragón
-fondo_url = "https://cdn.pixabay.com/photo/2022/11/04/10/24/dragon-7569512_1280.jpg"
+# Imagen del Mapa del Reino
+mapa_url = "https://images.unsplash.com/photo-1580136608260-42d1c4aa7fbb?q=80&w=2000&auto=format&fit=crop"
 
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Quicksand:wght@400;600&display=swap');
     
     .stApp {{
-        background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('{fondo_url}');
-        background-size: cover; background-position: center; background-attachment: fixed;
+        background-color: #1a1a1a;
+        color: white;
     }}
 
-    /* Estilo Pergamino Medieval */
+    /* Contenedor del Mapa Interactivo */
+    .map-container {{
+        position: relative;
+        width: 100%;
+        max-width: 900px;
+        margin: auto;
+        border: 10px solid #8b4513;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 0 50px rgba(0,0,0,0.8);
+    }}
+    
+    .map-image {{
+        width: 100%;
+        display: block;
+        opacity: 0.8;
+    }}
+
+    /* Estilo de los Puntos de Interés (Pins) */
+    .map-pin {{
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background: rgba(252, 211, 77, 0.9);
+        border: 3px solid #8b4513;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        transition: 0.3s;
+        box-shadow: 0 0 15px #fcd34d;
+    }}
+    .map-pin:hover {{
+        transform: scale(1.3);
+        background: #fcd34d;
+        z-index: 10;
+    }}
+
+    /* Pergamino */
     .parchment {{
         background: #fdf5e6;
         background-image: url("https://www.transparenttextures.com/patterns/old-paper.png");
-        padding: 30px; border-radius: 10px; border: 5px double #8b4513;
+        padding: 30px; border-radius: 10px; border: 4px solid #8b4513;
         color: #3e2723; font-family: 'Quicksand', sans-serif;
-        box-shadow: 10px 10px 20px rgba(0,0,0,0.5);
     }}
-
-    /* Animación flotante para el dragón */
-    @keyframes floating {{
-        0% {{ transform: translateY(0px); }}
-        50% {{ transform: translateY(-20px); }}
-        100% {{ transform: translateY(0px); }}
-    }}
-    .dragon-float {{ animation: floating 3s ease-in-out infinite; text-align: center; }}
-
-    .glass-panel {{
-        background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px);
-        border: 2px solid #fcd34d; border-radius: 20px; padding: 20px;
-        color: white; margin-bottom: 20px;
-    }}
-
-    .fancy-title {{ font-family: 'Cinzel', serif; color: #fcd34d !important; text-shadow: 2px 2px 10px #000; }}
+    
+    .fancy-title {{ font-family: 'Cinzel', serif; color: #fcd34d !important; text-shadow: 2px 2px 10px #000; text-align: center; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -59,58 +84,51 @@ def save_to_sheets(data):
         return True
     except: return False
 
-# --- 2. ESTADO DEL JUEGO (REFORZADO) ---
+# --- 2. ESTADO DEL JUEGO ---
 if 'user' not in st.session_state:
     st.session_state.user = {
         'nombre': 'Apprenti', 'xp': 0, 'monedas': 100, 'view': 'Home', 
-        'reino_actual': 'Mapa', 'inventario': [], 'last_login': None,
+        'reino_actual': None, 'inventario': [], 'last_login': None,
         'setup_complete': False
     }
 
-# Asegurar que las nuevas claves existan para usuarios antiguos (Evita KeyError)
-if 'reino_actual' not in st.session_state.user:
-    st.session_state.user['reino_actual'] = 'Mapa'
-
-fases_dragon = {"Oeuf": "huevo.png", "Bébé": "bebe.png", "Expert": "experto.png", "Maître": "adulto.png"}
+# Asegurar claves
+for key in ['reino_actual', 'setup_complete']:
+    if key not in st.session_state.user: st.session_state.user[key] = None
 
 def reward(xp, coins):
-    if "⚔️ Épée de Feu" in st.session_state.user['inventario']: xp = int(xp * 1.2)
-    if "🛡️ Armure en Or" in st.session_state.user['inventario']: coins = int(coins * 1.5)
     st.session_state.user['xp'] += xp
     st.session_state.user['monedas'] += coins
     return xp, coins
 
-def obtener_fase(xp):
-    if xp < 150: return "Oeuf"
-    elif xp < 400: return "Bébé"
-    elif xp < 800: return "Expert"
-    else: return "Maître"
+# --- 3. COMPONENTE MAPA INTERACTIVO ---
+def mostrar_mapa():
+    st.markdown("<h2 class='fancy-title'>Carte des Royaumes</h2>", unsafe_allow_html=True)
+    st.write("Haz clic en los iconos para viajar a cada reino:")
 
-# --- 3. CONTENIDO DE LOS REINOS ---
+    # HTML del Mapa con botones posicionados absolutamente
+    # Ajustamos las coordenadas % para que coincidan con zonas de la imagen
+    mapa_html = f"""
+    <div class="map-container">
+        <img src="{mapa_url}" class="map-image">
+        <div class="map-pin" style="top: 20%; left: 30%;" title="Valle Matemático">🔢</div>
+        <div class="map-pin" style="top: 50%; left: 70%;" title="Reino Francés">🇫🇷</div>
+        <div class="map-pin" style="top: 70%; left: 20%;" title="Laboratorio Alquimia">🧪</div>
+        <div class="map-pin" style="top: 30%; left: 80%;" title="Templo Musical">🎶</div>
+    </div>
+    """
+    st.markdown(mapa_html, unsafe_allow_html=True)
 
-def valle_mates():
-    st.markdown("<div class='parchment'><h3>🔢 Valle de las Matemáticas</h3><p>Resuelve el enigma para ganar oro:</p></div>", unsafe_allow_html=True)
-    n1, n2 = random.randint(1, 10), random.randint(1, 10)
-    ans = st.number_input(f"¿Cuánto es {n1} x {n2}?", step=1)
-    if st.button("Lanzar Hechizo"):
-        if ans == n1 * n2:
-            xp, co = reward(30, 15)
-            st.success(f"¡Magia pura! +{xp} XP / +{co} 🪙")
-        else: st.error("El hechizo se ha disuelto...")
+    # Botones reales de Streamlit para la lógica (el usuario hace clic aquí abajo por ahora)
+    c1, c2, c3, c4 = st.columns(4)
+    if c1.button("🔢 Matemáticas"): st.session_state.user['reino_actual'] = "Mates"
+    if c2.button("🇫🇷 Francés"): st.session_state.user['reino_actual'] = "Frances"
+    if c3.button("🧪 Ciencias"): st.session_state.user['reino_actual'] = "Ciencias"
+    if c4.button("🎶 Música"): st.session_state.user['reino_actual'] = "Musica"
 
-def reino_frances():
-    st.markdown("<div class='parchment'><h2>🇫🇷 Royaume du Français</h2><p>Traduction rapide :</p></div>", unsafe_allow_html=True)
-    op = st.radio("¿Cómo se dice 'Escuela'?", ["L'école", "Le château", "La forêt"])
-    if st.button("Vérifier"):
-        if op == "L'école":
-            xp, co = reward(30, 15)
-            st.success("Magnifique ! +30 XP")
-        else: st.error("Oups... réessaye !")
-
-# --- 4. VISTAS PRINCIPALES ---
-
+# --- 4. VISTAS ---
 if not st.session_state.user['setup_complete']:
-    st.markdown("<div class='glass-panel'><h1 class='fancy-title'>Bienvenue</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='parchment'><h1 style='text-align:center;'>Bienvenue</h1>", unsafe_allow_html=True)
     st.session_state.user['nombre'] = st.text_input("Comment t'appelles-tu, voyageur ?")
     if st.button("Lancer l'aventure ⚔️"):
         st.session_state.user['setup_complete'] = True
@@ -118,45 +136,33 @@ if not st.session_state.user['setup_complete']:
     st.markdown("</div>", unsafe_allow_html=True)
 
 else:
-    # Cofre diario
-    today = str(date.today())
-    if st.session_state.user['last_login'] != today:
-        st.session_state.user['last_login'] = today
-        reward(20, 50)
-        st.toast("🎁 Bonus quotidien reçu !", icon="💰")
-
-    # BARRA DE NAVEGACIÓN SUPERIOR
-    menu = st.tabs(["🏠 Foyer", "🗺️ Carte des Royaumes", "📜 Journal", "💎 Boutique"])
+    menu = st.tabs(["🏠 Foyer", "🗺️ Mapa", "📜 Journal", "💎 Boutique"])
 
     with menu[0]: # HOME
-        st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
-        fase = obtener_fase(st.session_state.user['xp'])
-        st.markdown(f"<h1 class='fancy-title'>Niveau : {fase}</h1>", unsafe_allow_html=True)
-        
-        # Dragón flotante
-        st.markdown('<div class="dragon-float">', unsafe_allow_html=True)
-        if os.path.exists(fases_dragon[fase]): st.image(fases_dragon[fase], width=300)
-        else: st.image("https://cdn-icons-png.flaticon.com/512/3069/3069418.png", width=200) # Imagen backup
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.write(f"### Chevalier {st.session_state.user['nombre']}")
-        st.write(f"✨ {st.session_state.user['xp']} XP | 🪙 {st.session_state.user['monedas']} Pièces")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(f"<h1 class='fancy-title'>Bonjour, {st.session_state.user['nombre']}</h1>", unsafe_allow_html=True)
+        st.write(f"✨ XP: {st.session_state.user['xp']} | 🪙 Monedas: {st.session_state.user['monedas']}")
+        # Mostrar Dragón aquí
 
     with menu[1]: # MAPA
-        st.markdown("<h2 class='fancy-title'>Explore les Terres</h2>", unsafe_allow_html=True)
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔢 Valle Matemático"): st.session_state.user['reino_actual'] = "Mates"
-            if st.button("🔬 Labo Alquimia (Ciencias)"): st.session_state.user['reino_actual'] = "Ciencias"
-        with col2:
-            if st.button("🇫🇷 Royaume Français"): st.session_state.user['reino_actual'] = "Frances"
-            if st.button("🎶 Templo Musical"): st.session_state.user['reino_actual'] = "Musica"
-        
+        mostrar_mapa()
         st.markdown("---")
-        if st.session_state.user['reino_actual'] == "Mates": valle_mates()
-        elif st.session_state.user['reino_actual'] == "Frances": reino_frances()
-        else: st.info("Selecciona un lugar en el mapa para empezar.")
+        if st.session_state.user['reino_actual'] == "Mates":
+            st.markdown("<div class='parchment'><h3>🔢 Reto Matemático</h3>", unsafe_allow_html=True)
+            res = st.number_input("¿Cuánto es 12 x 4?", step=1)
+            if st.button("Verificar"):
+                if res == 48: 
+                    reward(30, 20)
+                    st.success("¡Excelente!")
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+        elif st.session_state.user['reino_actual'] == "Frances":
+            st.markdown("<div class='parchment'><h3>🇫🇷 Reto de Francés</h3>", unsafe_allow_html=True)
+            res = st.text_input("¿Cómo se dice 'Hola'?")
+            if st.button("Valider"):
+                if res.lower() == "bonjour": 
+                    reward(30, 20)
+                    st.success("Bravo !")
+            st.markdown("</div>", unsafe_allow_html=True)
 
     with menu[2]: # JOURNAL
         st.markdown('<div class="parchment">', unsafe_allow_html=True)
@@ -167,23 +173,9 @@ else:
         if st.button("Sceller 🖋️"):
             if succ and fail:
                 xp_g, co_g = reward(40, 10)
-                data = [st.session_state.user['nombre'], today, sent, succ, fail, "", "", xp_g, co_g]
-                if save_to_sheets(data):
-                    st.success("Parchemin envoyé al profesor !")
-                    time.sleep(1); st.rerun()
+                data = [st.session_state.user['nombre'], str(date.today()), sent, succ, fail, "", "", xp_g, co_g]
+                if save_to_sheets(data): st.success("Guardado en el Excel real.")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with menu[3]: # BOUTIQUE
-        st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
-        st.markdown("<h1 class='fancy-title'>Boutique de l'Alchimiste</h1>", unsafe_allow_html=True)
-        items = {"⚔️ Épée de Feu (XP)": 50, "🛡️ Bouclier (Protección)": 40, "🛡️ Armure Or (Coins)": 100}
-        for it, pr in items.items():
-            c1, c2 = st.columns([3, 1])
-            c1.write(f"**{it}**")
-            if it in st.session_state.user['inventario']: c2.button("Poseído", disabled=True, key=it)
-            elif c2.button(f"{pr} 🪙", key=it):
-                if st.session_state.user['monedas'] >= pr:
-                    st.session_state.user['monedas'] -= pr
-                    st.session_state.user['inventario'].append(it)
-                    st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.info("Próximamente más armas legendarias...")
