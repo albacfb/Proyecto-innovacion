@@ -115,11 +115,12 @@ def valle_mates():
 def mostrar_mapa_interactivo():
     st.markdown("<h2 class='fancy-title'>Carte des Royaumes</h2>", unsafe_allow_html=True)
     
-    posiciones = {
-        "Mates": {'x': '28%', 'y': '25%'},
-        "Frances": {'x': '75%', 'y': '22%'},
-        "Ciencias": {'x': '28%', 'y': '70%'},
-        "Musica": {'x': '72%', 'y': '65%'}
+   posiciones = {
+        "Mates": {'x': '22%', 'y': '28%'},
+        "Frances": {'x': '78%', 'y': '25%'},
+        "Ciencias": {'x': '25%', 'y': '72%'},
+        "Musica": {'x': '68%', 'y': '75%'},
+        "Tech": {'x': '85%', 'y': '50%'}
     }
 
     # Intentar mostrar el mapa (usamos una URL directa si el archivo local falla para que no de error)
