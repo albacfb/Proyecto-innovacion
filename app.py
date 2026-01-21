@@ -4,50 +4,61 @@ import random
 import os
 from datetime import date
 import gspread
-import json # Importante para procesar el JSON de los secrets
+import json
 
 # --- 1. CONFIGURACIÓN Y ESTILO ---
 st.set_page_config(page_title="Les Dragons de l'Apprentissage", layout="centered", page_icon="🐉")
 
-fondo_reino = "https://images.unsplash.com/photo-1547826039-bfc3ade20521?q=80&w=1932&auto=format&fit=crop"
+# Fondo de castillo con dragón
+fondo_url = "https://images.unsplash.com/photo-1599408162172-19bc30f65839?q=80&w=2070&auto=format&fit=crop"
 
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Quicksand:wght@400;600&display=swap');
+    
     .stApp {{
-        background: url('{fondo_reino}');
+        background: url('{fondo_url}');
         background-size: cover; background-position: center; background-attachment: fixed;
     }}
-    .glass-panel {{
-        background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 30px; padding: 25px;
-        text-align: center; margin-bottom: 20px; color: #1e293b;
+
+    /* Animación flotante para el dragón */
+    @keyframes floating {{
+        0% {{ transform: translate(0, 0px); }}
+        50% {{ transform: translate(0, -15px); }}
+        100% {{ transform: translate(0, 0px); }}
     }}
-    .fancy-title {{ font-family: 'Cinzel', serif; color: #fcd34d !important; text-shadow: 2px 2px 8px #000; }}
-    .stButton button {{ border-radius: 12px; font-weight: bold; width: 100%; transition: 0.3s; }}
-    
-    .progress-container {{ width: 100%; background-color: rgba(0, 0, 0, 0.2); border-radius: 20px; margin: 20px 0; height: 20px; }}
-    .progress-bar {{ height: 100%; background: linear-gradient(90deg, #fcd34d, #f59e0b); box-shadow: 0 0 10px #fcd34d; border-radius: 20px; transition: width 0.5s; }}
+    .floating-dragon {{
+        animation: floating 3s ease-in-out infinite;
+        filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
+    }}
+
+    /* Estilo Pergamino Medieval para el Journal */
+    .parchment {{
+        background-color: #f2e3c9;
+        background-image: url("https://www.transparenttextures.com/patterns/paper-fibers.png");
+        padding: 40px;
+        border-radius: 5px;
+        border: 2px solid #8b4513;
+        box-shadow: 10px 10px 20px rgba(0,0,0,0.5);
+        color: #4a2c0f;
+        font-family: 'Quicksand', sans-serif;
+    }}
+
+    .glass-panel {{
+        background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 30px; padding: 25px;
+        text-align: center; margin-bottom: 20px; color: white;
+    }}
+    .fancy-title {{ font-family: 'Cinzel', serif; color: #fcd34d !important; text-shadow: 3px 3px 10px black; }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONEXIÓN A GOOGLE SHEETS (CORREGIDA) ---
+# --- CONEXIÓN A GOOGLE SHEETS ---
 def save_to_sheets(data):
     try:
-        # 1. Obtener los datos de los secrets
         creds_raw = st.secrets["google_sheets_creds"]
-        
-        # 2. Corregir el error 'str' object has no attribute 'keys'
-        # Si Streamlit Cloud lo lee como una cadena (string), lo convertimos a diccionario
-        if isinstance(creds_raw, str):
-            creds_info = json.loads(creds_raw)
-        else:
-            creds_info = dict(creds_raw)
-            
-        # 3. Conectar usando el diccionario de credenciales
+        creds_info = json.loads(creds_raw) if isinstance(creds_raw, str) else dict(creds_raw)
         gc = gspread.service_account_from_dict(creds_info)
-        
-        # 4. Abrir la hoja y la pestaña
         sh = gc.open("JournalApprentices").worksheet("JournalEntries")
         sh.append_row(data)
         return True
@@ -87,49 +98,72 @@ if not st.session_state.user['setup_complete']:
     st.markdown("</div>", unsafe_allow_html=True)
 
 else:
+    # --- COFRE DIARIO REAL ---
     today = str(date.today())
-    if st.session_state.user['last_login'] != today:
+    if st.session_state.user.get('last_login') != today:
         st.session_state.user['last_login'] = today
         reward(20, 50)
-        st.toast("🎁 Coffre quotidien !", icon="💰")
+        st.balloons()
+        st.toast("🎁 Bonus quotidien reçu !", icon="💰")
 
     fase = obtener_fase(st.session_state.user['xp'])
     
     if st.session_state.user['view'] == 'Home':
         st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
         st.markdown(f"<h1 class='fancy-title'>Niveau {fase}</h1>", unsafe_allow_html=True)
+        
+        # Dragón flotante
+        if os.path.exists(fases_dragon[fase]):
+            st.markdown(f'<div class="floating-dragon">', unsafe_allow_html=True)
+            st.image(fases_dragon[fase], width=350)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
         proximo = 150 if fase == "Oeuf" else 400 if fase == "Bébé" else 800 if fase == "Expert" else 1200
         porcentaje = min((st.session_state.user['xp'] / proximo) * 100, 100)
         st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{porcentaje}%"></div></div>', unsafe_allow_html=True)
         
-        if os.path.exists(fases_dragon[fase]): st.image(fases_dragon[fase], width=300)
-        else: st.warning(f"Image {fases_dragon[fase]} manquante")
+        st.write(f"### {st.session_state.user['nombre']}")
         st.write(f"✨ {st.session_state.user['xp']} XP | 🪙 {st.session_state.user['monedas']} Pièces")
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif st.session_state.user['view'] == 'Journal':
-        st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
-        st.markdown("<h2 class='fancy-title'>Mon Journal</h2>", unsafe_allow_html=True)
-        sent = st.select_slider("Sentiment", ["😞", "😐", "🙂", "🤩"])
+        st.markdown('<div class="parchment">', unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>📜 Mon Journal Royal</h2>", unsafe_allow_html=True)
+        sent = st.select_slider("Comment te sens-tu ?", ["😞", "😐", "🙂", "🤩"])
         succ = st.text_area("Aujourd'hui, j'ai réussi à...")
         fail = st.text_area("Je n'ai pas réussi à...")
-        chan = st.text_area("Changements pour la clase ?")
-        impr = st.text_area("Amélioration personnelle ?")
+        chan = st.text_area("Changements pour la classe ?")
         
-        if st.button("Enregistrer 📝"):
+        if st.button("Sceller le parchemin 🖋️"):
             if succ and fail:
                 xp_g, co_g = reward(40, 10)
-                # GUARDAR EN EXCEL
-                data = [st.session_state.user['nombre'], today, sent, succ, fail, chan, impr, xp_g, co_g]
+                data = [st.session_state.user['nombre'], today, sent, succ, fail, chan, "", xp_g, co_g]
                 if save_to_sheets(data):
-                    st.success("Données envoyées à l'Excel ! +40 XP")
+                    st.success("Enregistré dans le royaume !")
                     time.sleep(1); st.session_state.user['view'] = 'Home'; st.rerun()
-            else: st.error("Remplis les champs obligatorios !")
+            else: st.error("Remplis les champs !")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Navegación
+    elif st.session_state.user['view'] == 'Jeux':
+        st.markdown("<div class='glass-panel'><h3>🎮 Salle d'entraînement</h3><p>Prochainement disponible...</p></div>", unsafe_allow_html=True)
+
+    elif st.session_state.user['view'] == 'Boutique':
+         st.markdown("<div class='glass-panel'><h1 class='fancy-title'>Boutique de l'Alchimiste</h1></div>", unsafe_allow_html=True)
+         items = {"⚔️ Épée de Feu": 50, "🛡️ Bouclier Magique": 40, "🪖 Casque de Fer": 30, "🛡️ Armure en Or": 100}
+         for item, precio in items.items():
+            col1, col2 = st.columns([2, 1])
+            col1.write(f"**{item}**")
+            if item in st.session_state.user['inventario']: col2.button("Possédé", disabled=True, key=item)
+            elif col2.button(f"Acheter {precio} 🪙", key=item):
+                if st.session_state.user['monedas'] >= precio:
+                    st.session_state.user['monedas'] -= precio
+                    st.session_state.user['inventario'].append(item)
+                    st.rerun()
+
+    # Navegación fija abajo
+    st.markdown("---")
     cols = st.columns(4)
-    if cols[0].button("🏠 Home"): st.session_state.user['view'] = 'Home'; st.rerun()
+    if cols[0].button("🏠 Foyer"): st.session_state.user['view'] = 'Home'; st.rerun()
     if cols[1].button("📝 Journal"): st.session_state.user['view'] = 'Journal'; st.rerun()
     if cols[2].button("🎮 Jeux"): st.session_state.user['view'] = 'Jeux'; st.rerun()
     if cols[3].button("💎 Boutique"): st.session_state.user['view'] = 'Boutique'; st.rerun()
