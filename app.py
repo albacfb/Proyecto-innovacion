@@ -42,7 +42,7 @@ st.markdown(f"""
         background-size: cover;
         transform: translate(-50%, -50%);
         transition: left 1s ease-in-out, top 1s ease-in-out;
-        filter: drop-shadow(0 0 10px #fcd34d);
+        filter: drop-shadow(0 0 15px #fcd34d);
         z-index: 100;
     }}
 
@@ -68,7 +68,7 @@ def save_to_sheets(data):
         return True
     except: return False
 
-# --- 2. ESTADO DEL JUEGO (REFORZADO CONTRA KEYERROR) ---
+# --- 2. ESTADO DEL JUEGO ---
 if 'user' not in st.session_state:
     st.session_state.user = {
         'nombre': 'Apprenti', 'xp': 0, 'monedas': 100, 'view': 'Home', 
@@ -78,16 +78,9 @@ if 'user' not in st.session_state:
         'dragon_pos_y': '50%'
     }
 
-# ESTA PARTE ARREGLA TU ERROR: Si faltan las coordenadas las crea sobre la marcha
+# Seguridad de integridad de claves
 def check_user_integrity():
-    keys_needed = {
-        'dragon_pos_x': '50%',
-        'dragon_pos_y': '50%',
-        'reino_actual': None,
-        'setup_complete': False,
-        'xp': 0,
-        'monedas': 100
-    }
+    keys_needed = {'dragon_pos_x': '50%', 'dragon_pos_y': '50%', 'reino_actual': None, 'setup_complete': False}
     for key, default in keys_needed.items():
         if key not in st.session_state.user:
             st.session_state.user[key] = default
@@ -111,11 +104,22 @@ def valle_mates():
         else: st.error("Magia fallida...")
     st.markdown("</div>", unsafe_allow_html=True)
 
+def reino_frances():
+    st.markdown("<div class='parchment'><h3>🇫🇷 Royaume Français</h3><p>Traduction :</p>", unsafe_allow_html=True)
+    op = st.radio("¿Cómo se dice 'Castillo'?", ["Le chat", "Le château", "La pomme"])
+    if st.button("Vérifier"):
+        if op == "Le château":
+            reward(30, 15)
+            st.success("Bravo !")
+        else: st.error("Oups !")
+    st.markdown("</div>", unsafe_allow_html=True)
+
 # --- 4. MAPA INTERACTIVO ---
 def mostrar_mapa_interactivo():
     st.markdown("<h2 class='fancy-title'>Carte des Royaumes</h2>", unsafe_allow_html=True)
     
-   posiciones = {
+    # COORDENADAS EXACTAS DEL MAPA
+    posiciones = {
         "Mates": {'x': '22%', 'y': '28%'},
         "Frances": {'x': '78%', 'y': '25%'},
         "Ciencias": {'x': '25%', 'y': '72%'},
@@ -123,42 +127,44 @@ def mostrar_mapa_interactivo():
         "Tech": {'x': '85%', 'y': '50%'}
     }
 
-    # Intentar mostrar el mapa (usamos una URL directa si el archivo local falla para que no de error)
-    # Reemplaza 'TU_USUARIO' y 'TU_REPO' por tus datos reales de GitHub
-    url_github_mapa = "https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/mapa_reinos.png"
-
+    # Intentamos cargar la imagen localmente o mostramos fondo
     st.markdown(f"""
     <div class="map-container">
-        <img src="{url_github_mapa}" style="width:100%;" onerror="this.src='https://images.unsplash.com/photo-1580136608260-42d1c4aa7fbb?q=80&w=1000&auto=format&fit=crop'">
+        <img src="https://images.unsplash.com/photo-1580136608260-42d1c4aa7fbb?q=80&w=1000" style="width:100%; opacity:0.5;">
         <div class="map-dragon-icon" style="left: {st.session_state.user['dragon_pos_x']}; top: {st.session_state.user['dragon_pos_y']};"></div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.write("Selecciona tu destino:")
+    st.write("Selecciona tu destino para mover al dragón:")
     c1, c2, c3, c4 = st.columns(4)
     if c1.button("🔢 Valle Mates"):
         st.session_state.user['reino_actual'] = "Mates"
-        st.session_state.user['dragon_pos_x'], st.session_state.user['dragon_pos_y'] = posiciones["Mates"]['x'], posiciones["Mates"]['y']
+        st.session_state.user['dragon_pos_x'] = posiciones["Mates"]['x']
+        st.session_state.user['dragon_pos_y'] = posiciones["Mates"]['y']
         st.rerun()
     if c2.button("🇫🇷 Royaume Français"):
         st.session_state.user['reino_actual'] = "Frances"
-        st.session_state.user['dragon_pos_x'], st.session_state.user['dragon_pos_y'] = posiciones["Frances"]['x'], posiciones["Frances"]['y']
+        st.session_state.user['dragon_pos_x'] = posiciones["Frances"]['x']
+        st.session_state.user['dragon_pos_y'] = posiciones["Frances"]['y']
         st.rerun()
     if c3.button("🧪 Labo Alchimie"):
         st.session_state.user['reino_actual'] = "Ciencias"
-        st.session_state.user['dragon_pos_x'], st.session_state.user['dragon_pos_y'] = posiciones["Ciencias"]['x'], posiciones["Ciencias"]['y']
+        st.session_state.user['dragon_pos_x'] = posiciones["Ciencias"]['x']
+        st.session_state.user['dragon_pos_y'] = posiciones["Ciencias"]['y']
         st.rerun()
     if c4.button("🎶 Temple Musique"):
         st.session_state.user['reino_actual'] = "Musica"
-        st.session_state.user['dragon_pos_x'], st.session_state.user['dragon_pos_y'] = posiciones["Musica"]['x'], posiciones["Musica"]['y']
+        st.session_state.user['dragon_pos_x'] = posiciones["Musica"]['x']
+        st.session_state.user['dragon_pos_y'] = posiciones["Musica"]['y']
         st.rerun()
 
     if st.session_state.user['reino_actual'] == "Mates": valle_mates()
+    elif st.session_state.user['reino_actual'] == "Frances": reino_frances()
 
 # --- 5. LOGICA PRINCIPAL ---
 if not st.session_state.user['setup_complete']:
-    st.markdown("<div class='parchment'><h1>Bienvenue</h1>", unsafe_allow_html=True)
-    st.session_state.user['nombre'] = st.text_input("Comment t'appelles-tu ?")
+    st.markdown("<div class='parchment'><h1>Bienvenue Aventurier</h1>", unsafe_allow_html=True)
+    st.session_state.user['nombre'] = st.text_input("Ton nom :")
     if st.button("Commencer ⚔️"):
         st.session_state.user['setup_complete'] = True
         st.rerun()
@@ -177,7 +183,7 @@ else:
     with tab3:
         st.markdown('<div class="parchment"><h2>📜 Journal de Bord</h2>', unsafe_allow_html=True)
         sent = st.select_slider("Moral", ["😞", "😐", "🙂", "🤩"])
-        succ = st.text_area("Succès du jour")
+        succ = st.text_area("Ma victoire du jour...")
         if st.button("Sceller 🖋️"):
             if succ:
                 reward(40, 10)
