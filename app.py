@@ -1,169 +1,157 @@
 import streamlit as st
 import time
 import random
-import os
 from datetime import date
-import gspread
 import json
 
-# --- 1. CONFIGURACIÓN Y ESTILO ---
-st.set_page_config(page_title="Les Dragons de l'Apprentissage", layout="centered", page_icon="🐉")
-
-# Fondo de castillo con dragón
-fondo_url = "https://images.unsplash.com/photo-1599408162172-19bc30f65839?q=80&w=2070&auto=format&fit=crop"
-
-st.markdown(f"""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Quicksand:wght@400;600&display=swap');
-    
-    .stApp {{
-        background: url('{fondo_url}');
-        background-size: cover; background-position: center; background-attachment: fixed;
-    }}
-
-    /* Animación flotante para el dragón */
-    @keyframes floating {{
-        0% {{ transform: translate(0, 0px); }}
-        50% {{ transform: translate(0, -15px); }}
-        100% {{ transform: translate(0, 0px); }}
-    }}
-    .floating-dragon {{
-        animation: floating 3s ease-in-out infinite;
-        filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
-    }}
-
-    /* Estilo Pergamino Medieval para el Journal */
-    .parchment {{
-        background-color: #f2e3c9;
-        background-image: url("https://www.transparenttextures.com/patterns/paper-fibers.png");
-        padding: 40px;
-        border-radius: 5px;
-        border: 2px solid #8b4513;
-        box-shadow: 10px 10px 20px rgba(0,0,0,0.5);
-        color: #4a2c0f;
-        font-family: 'Quicksand', sans-serif;
-    }}
-
-    .glass-panel {{
-        background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 30px; padding: 25px;
-        text-align: center; margin-bottom: 20px; color: white;
-    }}
-    .fancy-title {{ font-family: 'Cinzel', serif; color: #fcd34d !important; text-shadow: 3px 3px 10px black; }}
-    </style>
-""", unsafe_allow_html=True)
-
-# --- CONEXIÓN A GOOGLE SHEETS ---
-def save_to_sheets(data):
-    try:
-        creds_raw = st.secrets["google_sheets_creds"]
-        creds_info = json.loads(creds_raw) if isinstance(creds_raw, str) else dict(creds_raw)
-        gc = gspread.service_account_from_dict(creds_info)
-        sh = gc.open("JournalApprentices").worksheet("JournalEntries")
-        sh.append_row(data)
-        return True
-    except Exception as e:
-        st.error(f"Erreur Excel: {e}")
-        return False
+# --- 1. CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Les Dragons de l’Apprentissage", layout="wide", page_icon="🐉")
 
 # --- 2. ESTADO DEL JUEGO ---
 if 'user' not in st.session_state:
     st.session_state.user = {
-        'nombre': 'Apprenti', 'xp': 0, 'monedas': 100, 'view': 'Home', 
-        'setup_complete': False, 'inventario': [], 'last_login': None 
+        'nombre': '',
+        'xp': 0,
+        'monedas': 10,
+        'inventario': [],
+        'reino_actual': 'Centro del Reino',
+        'setup_done': False,
+        'last_journal': None
     }
 
-fases_dragon = {"Oeuf": "huevo.png", "Bébé": "bebe.png", "Expert": "experto.png", "Maître": "adulto.png"}
+# --- 3. FUNCIONES DE APOYO ---
+def ganar_recompensa(xp_ganado, monedas_ganadas):
+    st.session_state.user['xp'] += xp_ganado
+    st.session_state.user['monedas'] += monedas_ganadas
+    st.toast(f"¡+{xp_ganado} XP y +{monedas_ganadas} 🪙!", icon="✨")
 
-def reward(xp, coins):
-    if "⚔️ Épée de Feu" in st.session_state.user['inventario']: xp = int(xp * 1.2)
-    if "🛡️ Armure en Or" in st.session_state.user['inventario']: coins = int(coins * 1.5)
-    st.session_state.user['xp'] += xp
-    st.session_state.user['monedas'] += coins
-    return xp, coins
+def obtener_imagen_dragon(xp):
+    # Evolución visual basada en el progreso académico
+    if xp < 50:
+        return "https://cdn-icons-png.flaticon.com/512/808/808506.png" # Huevo
+    elif xp < 150:
+        return "https://cdn-icons-png.flaticon.com/512/3554/3554371.png" # Bebé
+    else:
+        return "https://cdn-icons-png.flaticon.com/512/3069/3069418.png" # Adulto
 
-def obtener_fase(xp):
-    if xp < 150: return "Oeuf"
-    elif xp < 400: return "Bébé"
-    elif xp < 800: return "Expert"
-    else: return "Maître"
+# --- 4. ESTILOS VISUALES ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #1a1a1a; color: white; }
+    .parchment {
+        background: #fdf5e6;
+        background-image: url("https://www.transparenttextures.com/patterns/old-paper.png");
+        padding: 30px; border-radius: 10px; border: 4px solid #8b4513;
+        color: #3e2723; font-family: 'serif';
+        margin-bottom: 20px;
+    }
+    .stat-card {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 10px; border-radius: 10px; border: 1px solid gold;
+        text-align: center;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# --- 3. VISTAS ---
-if not st.session_state.user['setup_complete']:
-    st.markdown("<div class='glass-panel'><h1 class='fancy-title'>Bienvenue</h1>", unsafe_allow_html=True)
-    st.session_state.user['nombre'] = st.text_input("Ton nom, Apprenti :")
+# --- 5. LÓGICA DE INICIO ---
+if not st.session_state.user['setup_done']:
+    st.title("🏹 Bienvenue au Royaume des Dragons")
+    st.subheader("Tu aventura de innovación docente comienza aquí.")
+    nombre = st.text_input("¿Cómo te llamas, joven aprendiz?")
     if st.button("Lancer l'aventure ⚔️"):
-        st.session_state.user['setup_complete'] = True
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
+        if nombre:
+            st.session_state.user['nombre'] = nombre
+            st.session_state.user['setup_done'] = True
+            st.rerun()
 else:
-    # --- COFRE DIARIO REAL ---
-    today = str(date.today())
-    if st.session_state.user.get('last_login') != today:
-        st.session_state.user['last_login'] = today
-        reward(20, 50)
-        st.balloons()
-        st.toast("🎁 Bonus quotidien reçu !", icon="💰")
+    # --- SIDEBAR (Panel de Control del Alumno) ---
+    with st.sidebar:
+        st.header(f"Chevalier: {st.session_state.user['nombre']}")
+        st.image(obtener_imagen_dragon(st.session_state.user['xp']), width=150)
+        
+        col1, col2 = st.columns(2)
+        with col1: st.metric("XP", st.session_state.user['xp'])
+        with col2: st.metric("🪙 Or", st.session_state.user['monedas'])
+        
+        st.write("---")
+        st.subheader("🎒 Inventaire de l'Apprenti")
+        if st.session_state.user['inventario']:
+            for item in st.session_state.user['inventario']: st.write(f"🛡️ {item}")
+        else: st.write("*Tu inventario está vacío*")
 
-    fase = obtener_fase(st.session_state.user['xp'])
-    
-    if st.session_state.user['view'] == 'Home':
-        st.markdown("<div class='glass-panel'>", unsafe_allow_html=True)
-        st.markdown(f"<h1 class='fancy-title'>Niveau {fase}</h1>", unsafe_allow_html=True)
+    # --- PESTAÑAS PRINCIPALES ---
+    tab_foyer, tab_mapa, tab_juegos, tab_journal = st.tabs(["🏠 Foyer", "🗺️ Carte des Savoirs", "🎮 Entraînement", "📜 Journal Royal"])
+
+    with tab_foyer:
+        st.title("Estado de tu Dragón")
+        c_img, c_info = st.columns([1, 2])
+        with c_img:
+            st.image(obtener_imagen_dragon(st.session_state.user['xp']), width=300)
+        with c_info:
+            xp = st.session_state.user['xp']
+            if xp < 50:
+                st.subheader("Fase: Huevo")
+                st.write("Registra tus aprendizajes en el Journal para que el huevo eclosione.")
+                st.progress(xp / 50)
+            elif xp < 150:
+                st.subheader("Fase: Dragón Joven")
+                st.write("¡Has eclosionado! Sigue superando retos en los reinos.")
+                st.progress((xp - 50) / 100)
+            else:
+                st.subheader("Fase: Dragón Maestro")
+                st.balloons()
+                st.success("¡Has alcanzado la maestría máxima!")
+
+    with tab_mapa:
+        st.title("Mapa de las Asignaturas (Transversalidad)")
+        st.write("Viaja a los distintos reinos para desbloquear conocimientos.")
         
-        # Dragón flotante
-        if os.path.exists(fases_dragon[fase]):
-            st.markdown(f'<div class="floating-dragon">', unsafe_allow_html=True)
-            st.image(fases_dragon[fase], width=350)
-            st.markdown('</div>', unsafe_allow_html=True)
+        # Simulación de Mapa con columnas
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            if st.button("🇫🇷 Royaume Français"): st.session_state.user['reino_actual'] = "Royaume Français"
+        with col_m2:
+            if st.button("🔢 Valle Matemático"): st.session_state.user['reino_actual'] = "Valle Matemático"
+        with col_m3:
+            if st.button("🧪 Labo Alchimie (Ciencias)"): st.session_state.user['reino_actual'] = "Laboratorio de Alquimia"
+            
+        st.info(f"📍 Estás en: **{st.session_state.user['reino_actual']}**")
+
+    with tab_juegos:
+        st.title("Minijuegos de Entrenamiento")
+        juego = st.selectbox("Selecciona tu prueba:", ["Cálculo de Fuego", "Traductor de Pergaminos"])
         
-        proximo = 150 if fase == "Oeuf" else 400 if fase == "Bébé" else 800 if fase == "Expert" else 1200
-        porcentaje = min((st.session_state.user['xp'] / proximo) * 100, 100)
-        st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{porcentaje}%"></div></div>', unsafe_allow_html=True)
+        if juego == "Cálculo de Fuego":
+            n1, n2 = random.randint(5, 15), random.randint(2, 9)
+            res = st.number_input(f"¿Cuánto es {n1} x {n2}?", step=1)
+            if st.button("Lanzar Ataque Mágico"):
+                if res == n1 * n2:
+                    st.success("¡Impacto directo!")
+                    ganar_recompensa(15, 5)
+                else: st.error("El hechizo falló...")
+
+    with tab_journal:
+        st.markdown("<div class='parchment'>", unsafe_allow_html=True)
+        st.title("📜 Journal de l'Apprenti")
+        st.write("Esta es la parte más importante: tu reflexión sobre lo aprendido hoy.")
         
-        st.write(f"### {st.session_state.user['nombre']}")
-        st.write(f"✨ {st.session_state.user['xp']} XP | 🪙 {st.session_state.user['monedas']} Pièces")
+        # Campos detallados para el Proyecto de Innovación
+        f_hoy = st.date_input("Fecha del registro", date.today())
+        sentimiento = st.select_slider("¿Cómo te has sentido hoy aprendiendo?", options=["😞", "😐", "🙂", "🤩"])
+        
+        st.write("---")
+        logro = st.text_area("1. ¿Qué éxito has conseguido hoy? (Objetivos alcanzados)")
+        dificultad = st.text_area("2. ¿Qué ha sido lo más difícil y por qué?")
+        estrategia = st.text_area("3. ¿Qué has hecho para superar esa dificultad?")
+        mejora = st.text_area("4. ¿Qué te gustaría aprender o mejorar mañana?")
+        feedback = st.text_area("5. Mensaje para el Maestro (Propuestas para la clase)")
+        
+        if st.button("Sellar Diario 🖋️"):
+            if logro and dificultad:
+                ganar_recompensa(40, 10)
+                st.balloons()
+                st.success("Tus reflexiones han sido enviadas a la Torre del Maestro.")
+                st.session_state.user['last_journal'] = str(f_hoy)
+            else:
+                st.error("Debes completar al menos los dos primeros apartados para ganar XP.")
         st.markdown("</div>", unsafe_allow_html=True)
-
-    elif st.session_state.user['view'] == 'Journal':
-        st.markdown('<div class="parchment">', unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center;'>📜 Mon Journal Royal</h2>", unsafe_allow_html=True)
-        sent = st.select_slider("Comment te sens-tu ?", ["😞", "😐", "🙂", "🤩"])
-        succ = st.text_area("Aujourd'hui, j'ai réussi à...")
-        fail = st.text_area("Je n'ai pas réussi à...")
-        chan = st.text_area("Changements pour la classe ?")
-        
-        if st.button("Sceller le parchemin 🖋️"):
-            if succ and fail:
-                xp_g, co_g = reward(40, 10)
-                data = [st.session_state.user['nombre'], today, sent, succ, fail, chan, "", xp_g, co_g]
-                if save_to_sheets(data):
-                    st.success("Enregistré dans le royaume !")
-                    time.sleep(1); st.session_state.user['view'] = 'Home'; st.rerun()
-            else: st.error("Remplis les champs !")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    elif st.session_state.user['view'] == 'Jeux':
-        st.markdown("<div class='glass-panel'><h3>🎮 Salle d'entraînement</h3><p>Prochainement disponible...</p></div>", unsafe_allow_html=True)
-
-    elif st.session_state.user['view'] == 'Boutique':
-         st.markdown("<div class='glass-panel'><h1 class='fancy-title'>Boutique de l'Alchimiste</h1></div>", unsafe_allow_html=True)
-         items = {"⚔️ Épée de Feu": 50, "🛡️ Bouclier Magique": 40, "🪖 Casque de Fer": 30, "🛡️ Armure en Or": 100}
-         for item, precio in items.items():
-            col1, col2 = st.columns([2, 1])
-            col1.write(f"**{item}**")
-            if item in st.session_state.user['inventario']: col2.button("Possédé", disabled=True, key=item)
-            elif col2.button(f"Acheter {precio} 🪙", key=item):
-                if st.session_state.user['monedas'] >= precio:
-                    st.session_state.user['monedas'] -= precio
-                    st.session_state.user['inventario'].append(item)
-                    st.rerun()
-
-    # Navegación fija abajo
-    st.markdown("---")
-    cols = st.columns(4)
-    if cols[0].button("🏠 Foyer"): st.session_state.user['view'] = 'Home'; st.rerun()
-    if cols[1].button("📝 Journal"): st.session_state.user['view'] = 'Journal'; st.rerun()
-    if cols[2].button("🎮 Jeux"): st.session_state.user['view'] = 'Jeux'; st.rerun()
-    if cols[3].button("💎 Boutique"): st.session_state.user['view'] = 'Boutique'; st.rerun()
